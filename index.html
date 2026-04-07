@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audiometry Suite | Professional</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0f172a;
+            --accent-right: #ef4444;
+            --accent-left: #3b82f6;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Header & Navigation */
+        header {
+            background: var(--primary);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .tabs {
+            display: flex;
+            background: #334155;
+            padding: 4px;
+            border-radius: 8px;
+            gap: 4px;
+        }
+
+        .tab-btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: transparent;
+            color: #94a3b8;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+
+        .tab-btn.active {
+            background: white;
+            color: var(--primary);
+        }
+
+        /* Layout */
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            max-width: 1000px;
+            margin: auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .container { display: none; animation: fadeIn 0.3s ease; }
+        .container.active { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card {
+            background: var(--card);
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Dashboard Controls */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        select {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            font-size: 1rem;
+            min-width: 200px;
+            outline: none;
+        }
+
+        /* Patient Room Buttons */
+        .test-grid {
+            display: grid;
+            gap: 1.5rem;
+            max-width: 500px;
+            margin: 2rem auto;
+        }
+
+        .btn-big {
+            padding: 2rem;
+            font-size: 1.25rem;
+            font-weight: 700;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .heard {
+            background: #dcfce7;
+            color: #166534;
+            border: 2px solid #bbf7d0;
+        }
+
+        .heard:hover { background: #bbf7d0; transform: translateY(-2px); }
+
+        .not-heard {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 2px solid #fecaca;
+        }
+
+        .not-heard:hover { background: #fecaca; transform: translateY(-2px); }
+
+        #testStatus {
+            margin-top: 1rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        canvas {
+            max-height: 500px;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div style="font-weight: 700; font-size: 1.2rem;">AUDIOSUITE<span style="color:var(--accent-left)">PRO</span></div>
+        <div class="tabs">
+            <button class="tab-btn active" id="btn-doctor" onclick="switchTab('doctor')">Doctor View</button>
+            <button class="tab-btn" id="btn-patient" onclick="switchTab('patient')">Patient Room</button>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div id="doctor" class="container active">
+            <div class="card">
+                <div class="controls">
+                    <div>
+                        <h2 style="margin:0">Audiogram Report</h2>
+                        <p id="testTime" style="color: var(--text-light); margin: 5px 0 0 0; font-size: 0.85rem;">Waiting for data...</p>
+                    </div>
+                    <select id="patientSelect" onchange="updateDashboard()"></select>
+                </div>
+                <div style="position: relative; height:450px;">
+                    <canvas id="audiogramCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="patient" class="container">
+            <div class="card" style="text-align: center;">
+                <h2 style="margin-top:0">Hearing Assessment</h2>
+                <p style="color: var(--text-light)">Please focus. Click the green button as soon as you hear a tone.</p>
+                
+                <div class="test-grid">
+                    <button class="btn-big heard" onclick="submitResponse('Heard')">
+                        I Heard The Sound
+                    </button>
+                    <button class="btn-big not-heard" onclick="submitResponse('Not_Heard')">
+                        No Sound Detected
+                    </button>
+                </div>
+                
+                <div id="testStatus">Ready to begin</div>
+            </div>
+        </div>
+    </main>
+
+<script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwWzSZViY-1BworVAWGxMuvF36JT-S6RAFM88QLbjxTUvrHEseXOZUEXCq_L4WCqFtG/exec";
+    const FREQUENCIES = ['250', '500', '1000', '2000', '4000', '8000'];
+    
+    let allData = [];
+    let chartInstance = null;
+
+    function switchTab(tab) {
+        document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tab).classList.add('active');
+        document.getElementById('btn-' + tab).classList.add('active');
+        if(tab === 'doctor') refreshData();
+    }
+
+    async function refreshData() {
+        try {
+            const res = await fetch(`${SCRIPT_URL}?read=true&nocache=${Date.now()}`);
+            const data = await res.json();
+            if (!Array.isArray(data)) return;
+
+            allData = data;
+            const sel = document.getElementById('patientSelect');
+            const currentVal = sel.value;
+            
+            const patients = [...new Set(data.map(d => d.patient))].reverse();
+            sel.innerHTML = "";
+            patients.forEach(p => {
+                let o = document.createElement('option');
+                o.value = p; o.textContent = p;
+                sel.appendChild(o);
+            });
+
+            if (currentVal && patients.includes(currentVal)) sel.value = currentVal;
+            updateDashboard();
+        } catch (e) { console.error("Fetch Error:", e); }
+    }
+
+    function updateDashboard() {
+        const id = document.getElementById('patientSelect').value;
+        const patientData = allData.filter(d => d.patient === id);
+
+        if (patientData.length > 0) {
+            document.getElementById('testTime').innerText = "Last transmission: " + patientData[0].timestamp;
+        }
+
+        const buildEarData = (earName) => {
+            return FREQUENCIES.map(f => {
+                const match = patientData.find(d => 
+                    d.frequency.toString().trim() === f && 
+                    d.ear.toString().trim().toLowerCase() === earName.toLowerCase()
+                );
+                if (!match) return null;
+                // Standard audiometry mapping: Heard = Higher up (closer to 0), Not Heard = Lower down
+                return match.status === "Heard" ? 15 : 85;
+            });
+        };
+
+        renderChart(buildEarData("Right"), buildEarData("Left"));
+    }
+
+    function renderChart(right, left) {
+        const ctx = document.getElementById('audiogramCanvas').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: FREQUENCIES,
+                datasets: [
+                    {
+                        label: 'Right Ear (RED)',
+                        data: right,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        pointStyle: 'circle',
+                        pointRadius: 8,
+                        pointHoverRadius: 12,
+                        fill: true,
+                        tension: 0.3,
+                        spanGaps: true,
+                        borderWidth: 4
+                    },
+                    {
+                        label: 'Left Ear (BLUE)',
+                        data: left,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        pointStyle: 'crossRot',
+                        pointRadius: 10,
+                        pointHoverRadius: 14,
+                        fill: true,
+                        tension: 0.3,
+                        spanGaps: true,
+                        borderWidth: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        reverse: true,
+                        min: 0,
+                        max: 100,
+                        grid: { color: '#e2e8f0' },
+                        title: { display: true, text: 'Hearing Level (dB HL)', font: { weight: 'bold' } }
+                    },
+                    x: { 
+                        grid: { display: false },
+                        title: { display: true, text: 'Frequency (Hz)', font: { weight: 'bold' } } 
+                    }
+                },
+                plugins: {
+                    legend: { position: 'top', labels: { usePointStyle: true, padding: 20, font: { size: 14, weight: '600' } } },
+                    tooltip: { padding: 12, cornerRadius: 8 }
+                }
+            }
+        });
+    }
+
+    async function submitResponse(status) {
+        const el = document.getElementById('testStatus');
+        el.innerText = "Transmitting response...";
+        el.style.color = "#64748b";
+
+        try {
+            await fetch(`${SCRIPT_URL}?action=patientResponse&status=${status}&t=${Date.now()}`, {
+                mode: 'no-cors',
+                cache: 'no-store'
+            });
+            el.innerText = "Response recorded. Please wait for the next tone.";
+            el.style.color = "#059669";
+        } catch (e) {
+            el.innerText = "Connection lost. Please try again.";
+            el.style.color = "#dc2626";
+        }
+    }
+
+    setInterval(() => {
+        if (document.getElementById('doctor').classList.contains('active')) {
+            refreshData();
+        }
+    }, 5000);
+
+    window.onload = refreshData;
+</script>
+</body>
+</html>
